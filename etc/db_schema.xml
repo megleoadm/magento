@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="quote_address" resource="checkout" comment="Sales Flat Quote Address">
+        <column xsi:type="varchar" name="cpf" nullable="true" length="255" comment="CPF"/>
+        <column xsi:type="varchar" name="cnpj" nullable="true" length="255" comment="CNPJ"/>
+    </table>
+    <table name="sales_order_address" resource="sales" engine="innodb" comment="Sales Flat Order Address">
+        <column xsi:type="varchar" name="cpf" nullable="true" length="255" comment="CPF"/>
+        <column xsi:type="varchar" name="cnpj" nullable="true" length="255" comment="CNPJ"/>
+    </table>
+</schema>

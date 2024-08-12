@@ -1,0 +1,9 @@
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="1column" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+	<update handle="customer_account"/>
+	<body>
+		<referenceContainer name="form.additional.info">
+			<block class="Magento\Customer\Block\Form\Edit" name="cpf" template="Megleo_Delivery::form/edit/cpf.phtml"/>
+			<block class="Magento\Customer\Block\Form\Edit" name="cnpj" template="Megleo_Delivery::form/edit/cnpj.phtml"/>
+		</referenceContainer>
+	</body>
+</page>

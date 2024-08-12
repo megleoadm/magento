@@ -1,0 +1,12 @@
+<legend class="legend">
+    <span><?php /* @escapeNotVerified */ echo __('Documentos') ?></span>
+</legend>
+<br>
+<div class="field cpf required">
+    <label class="label" for="cpf">
+        <span><?= $block->escapeHtml(__('CPF')) ?></span>
+    </label>
+    <div class="control">
+        <input type="text" name="cpf" id="cpf" title="<?php /* @escapeNotVerified */ echo __('CPF') ?>" class="input-text" data-validate="{required:true}" autocomplete="off">
+    </div>
+</div>

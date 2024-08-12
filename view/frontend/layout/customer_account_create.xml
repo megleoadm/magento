@@ -1,0 +1,8 @@
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="1column" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd"> 
+    <body>
+        <referenceContainer name="form.additional.info">
+            <block class="Magento\Customer\Block\Form\Register" name="cpf" template="Megleo_Delivery::form/cpf.phtml"/>
+            <block class="Magento\Customer\Block\Form\Register" name="cnpj" template="Megleo_Delivery::form/cnpj.phtml"/>
+        </referenceContainer> 
+    </body> 
+</page>
