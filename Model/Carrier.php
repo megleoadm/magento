@@ -376,7 +376,7 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 		$rate->setCarrier($this->_code);
 		$rate->setCarrierTitle($this->getConfigData('title'));
 		$rate->setData('method_description', 'ID ' . $servico->transportadoraId);
-		$rate->setMethod($method);
+		$rate->setMethod($method . '_' . $servico->transportadora_cnpj);
 
 		$title = $method;
 		if ($this->getConfigData('prazo_entrega')) {
@@ -466,6 +466,7 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 
 				$service->transportadoraId = $result->id;
 				$service->transportadora_nome = $result->transportadora_nome;
+				$service->transportadora_cnpj = $result->transportadora_cnpj;
 				$service->preco = $result->valor_fatura_com_coleta;
 				$service->prazoEntrega = $result->dias_normal;
 				if (isset($result->msgPrazo)) {
