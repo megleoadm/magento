@@ -82,13 +82,13 @@ class CreateShipmentQuote implements ObserverInterface
             $orderId = $order->getId();
             $quote = $this->quoteFactory->create()->load($order->getQuoteId());
 
-            $transportadoraId = $this->getTransportadoraId($quote);
+            // $transportadoraId = $this->getTransportadoraId($quote);
             $shippingAddress  = $order->getShippingAddress();
 
             $token  = $this->getConfigData('codigo_acesso');
             $client = new Client($token);
 
-            $criarPedido = $client->criarPedidoParcial();
+            $criarPedido = $client->criarPedidoSimplificado();
 
             foreach ($order->getAllItems() as $item) {
                 if ($item->getProduct()->isVirtual()) {
@@ -104,34 +104,42 @@ class CreateShipmentQuote implements ObserverInterface
                 ->withOrderId($orderId)
                 ->withCepOrigem($this->getFromZip($order))
                 ->withCepDestino($shippingAddress->getData('postcode'))
-                ->withValorNota($order->getSubtotal());
+                ->withValorNota($order->getSubtotal())
+                ->withCustomer($customer);
 
             try {
                 $response = $criarPedido->criar();
 
                 if (!empty($response->error)) {
-                    $this->logger->critical("ERRO API Megleo retornou um erro /api/v1/pedidos/criar: " . $response->error);
+                    $this->logger->critical("ERRO API Megleo retornou um erro /api/v1_2/pedidos/criar_simplificado: " . $response->error);
                     return false;
                 }
-
-                $chaveRastreio = $response->cotacao->chave_rastreio;
             } catch (Exception $e) {
-                $this->logger->critical("ERRO chamada à API Megleo /api/v1/pedidos/criar: " . $e->getMessage());
+                $this->logger->critical("ERRO chamada à API Megleo /api/v1_2/pedidos/criar_simplificado: " . $e->getMessage());
                 return false;
             }
 
-            $definirTransportadora = $client->definirTransportadora();
-
-            $definirTransportadora
-                ->withChaveCotacao($chaveRastreio)
-                ->withTransportadoraId($transportadoraId)
-                ->withCustomer($customer);
-
-            try {
-                $definirTransportadora->definir();
-            } catch (Exception $e) {
-                $this->logger->critical("ERRO chamada à API Megleo /v1/pedidos/definir_apenas_transportadora: " . $e->getMessage());
+            $dataResponse = $response->data ?? [];
+            if (!is_array($dataResponse)) {
+                $dataResponse = [$dataResponse];
             }
+
+            $metadata = [];
+            foreach ($dataResponse as $result) {
+                $data = new stdClass();
+
+                $data->cnpj_pagador = $result->cnpj_pagador;
+                $data->endereco_coleta = $result->endereco_coleta;
+                $data->transportadora = $result->transportadora;
+                $data->volumes = $result->volumes;
+
+                $metadata[] = $data;
+            }
+
+            $megleoMetadata = json_encode($metadata, JSON_PRETTY_PRINT);
+
+            $order->setMegleoMetadata($megleoMetadata);
+            $order->save();
         }
     }
 
@@ -207,7 +215,7 @@ class CreateShipmentQuote implements ObserverInterface
         $recipient->cpf  = $cpf;
         $recipient->cnpj = $cnpj;
 
-        $recipient->telefone = '';
+        $recipient->telefone = $shippingAddress->getTelephone();
         $recipient->nome  = $quote->getData('customer_firstname') . ' ' . $quote->getData('customer_lastname');
         $recipient->email = $quote->getData('customer_email');
 

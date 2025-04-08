@@ -27,6 +27,10 @@ use Magento\Shipping\Model\Carrier\CarrierInterface;
 use Magento\Quote\Api\Data\AddressInterface;
 use Magento\Customer\Model\Session as CustomerSession;
 use Psr\Log\LoggerInterface;
+
+use Magento\InventoryApi\Api\SourceRepositoryInterface;
+use Magento\Framework\Api\SearchCriteriaBuilder;
+
 use stdClass;
 
 class Carrier extends AbstractCarrierOnline implements CarrierInterface
@@ -70,6 +74,9 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 	 */
 	private $_customerSession;
 
+	protected $sourceRepository;
+	protected $searchCriteriaBuilder;
+
 	public function __construct(
 		ScopeConfigInterface $scopeConfig,
 		ErrorFactory $rateErrorFactory,
@@ -88,6 +95,8 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 		\Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry,
 		AddressInterface $addressInformation,
 		CustomerSession $customerSession,
+		SourceRepositoryInterface $sourceRepository,
+		SearchCriteriaBuilder $searchCriteriaBuilder,
 		array $data = []
 	) {
 		parent::__construct(
@@ -112,6 +121,9 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 		$this->logger = $logger;
 		$this->_addressInformation = $addressInformation;
 		$this->_customerSession = $customerSession;
+
+		$this->sourceRepository = $sourceRepository;
+		$this->searchCriteriaBuilder = $searchCriteriaBuilder;
 	}
 
 	/**
@@ -126,6 +138,24 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 	public function processAdditionalValidation(\Magento\Framework\DataObject $request)
 	{
 		return $this;
+	}
+
+	public function getAllStoreSources()
+	{
+		$searchCriteria = $this->searchCriteriaBuilder->create();
+		$sources = $this->sourceRepository->getList($searchCriteria);
+		return $sources->getItems();
+	}
+
+	public function getFirstSourceZipCode()
+	{
+		$sources = $this->getAllStoreSources();
+		foreach ($sources as $source) {
+			if ($source->isEnabled() && !empty($source->getPostcode())) {
+				return preg_replace('/\D/', '', $source->getPostcode());
+			}
+		}
+		return false;
 	}
 
 	private function check(RateRequest $request)
@@ -145,8 +175,8 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 			return false;
 		}
 
-		$this->fromZip = $this->_scopeConfig->getValue(Shipment::XML_PATH_STORE_ZIP, \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $request->getStoreId());
-		$this->fromZip = preg_replace('/\D/', '', $this->fromZip);
+		$this->fromZip = $this->getFirstSourceZipCode();
+		$this->fromZip = preg_replace('/\D/', '', $this->fromZip ?? '');
 		if (!preg_match('/^([0-9]{8})$/', $this->fromZip)) {
 			$rate = $this->_rateErrorFactory->create();
 			$rate->setCarrier($this->_code);

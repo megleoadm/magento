@@ -9,14 +9,15 @@ use GuzzleHttp\Client as HttpClient;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\RequestException;
 use Megleo\Delivery\Sdk\Endpoints\CriarPedidoParcial;
+use Megleo\Delivery\Sdk\Endpoints\CriarPedidoSimplificado;
 use Megleo\Delivery\Sdk\Endpoints\DefinirTransportadora;
 
 class Client
 {
     /**
      * @var string
-     */ 
-    protected const BASE_URI = 'https://app.megleo.com.br/api/v1/';
+     */
+    protected const BASE_URI = 'https://app.megleo.com.br/api/v1_2/';
 
     /**
      * @var \GuzzleHttp\Client
@@ -32,6 +33,11 @@ class Client
      * @var SimularValor
      */
     private $simularValor;
+
+    /**
+     * @var CriarPedidoSimplificado
+     */
+    private $criarPedidoSimplificado;
 
     /**
      * @var CriarPedidoParcial
@@ -58,6 +64,7 @@ class Client
         $this->http = new HttpClient($options);
         $this->simularValor = new SimularValor($this);
         $this->criarPedidoParcial = new CriarPedidoParcial($this);
+        $this->criarPedidoSimplificado = new CriarPedidoSimplificado($this);
         $this->definirTransportadora = new DefinirTransportadora($this);
 
         $this->setToken(trim($token));
@@ -116,6 +123,14 @@ class Client
     public function simularValor()
     {
         return $this->simularValor;
+    }
+
+    /**
+     * @return CriarPedidoSimplificado
+     */
+    public function criarPedidoSimplificado()
+    {
+        return $this->criarPedidoSimplificado;
     }
 
     /**

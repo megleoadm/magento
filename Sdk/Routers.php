@@ -17,6 +17,16 @@ class Routers
         return $anonymous;
     }
 
+    public static function criarPedidoSimplificado()
+    {
+        $anonymous = new Anonymous();
+        $anonymous->criar = static function () {
+            return 'pedidos/criar_simplificado';
+        };
+
+        return $anonymous;
+    }
+
     /**
      * Retorna url para definir transportadora em pedido parcial
      */
