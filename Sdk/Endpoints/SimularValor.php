@@ -26,9 +26,11 @@ class SimularValor extends Endpoint
             $volumes[] = [
                 'quantidade' => $product['qty'],
                 'peso' => $product['weight'],
+                'un_medida' => 'cm',
                 'comprimento' => $product['length'],
                 'largura' => $product['width'],
                 'altura' => $product['height'],
+                'sku' => $product['sku'],
             ];
         }
 
