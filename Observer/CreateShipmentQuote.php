@@ -132,7 +132,8 @@ class CreateShipmentQuote implements ObserverInterface
                 $data->endereco_coleta = $result->endereco_coleta;
                 $data->transportadora = $result->transportadora;
                 $data->volumes = $result->volumes;
-
+                $data->valor_fatura = $result->valor_fatura;
+                
                 $metadata[] = $data;
             }
 

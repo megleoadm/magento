@@ -6,4 +6,7 @@
     <type name="Magento\Quote\Api\ShipmentEstimationInterface">
         <plugin disabled="false" name="Megleo_Delivery_Plugin_ShipmentEstimationPlugin" type="Megleo\Delivery\Plugins\ShipmentEstimationPlugin"/>
     </type>
+    <type name="Magento\Sales\Api\OrderRepositoryInterface">
+        <plugin name="add_megleo_metadata_to_order" type="Megleo\Delivery\Plugins\AddMegleoMetadataToOrder" />
+    </type>
 </config>

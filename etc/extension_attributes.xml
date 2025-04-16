@@ -5,4 +5,7 @@
         <attribute code="cpf" type="string" />
         <attribute code="cnpj" type="string" />
     </extension_attributes>
+    <extension_attributes for="Magento\Sales\Api\Data\OrderInterface">
+        <attribute code="megleo_metadata" type="string" />
+    </extension_attributes>
 </config>
