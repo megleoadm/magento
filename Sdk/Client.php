@@ -55,7 +55,11 @@ class Client
      */
     public function __construct(string $token, ?array $extras = null)
     {
-        $options = ['base_uri' => self::BASE_URI];
+        $options = [
+            'base_uri' => self::BASE_URI,
+            'connect_timeout' => 10,
+            'timeout' => 30,
+        ];
 
         if ($extras !== null) {
             $options = array_merge($options, $extras);
@@ -92,8 +96,6 @@ class Client
         } catch (InvalidJsonException $exception) {
             throw $exception;
         } catch (RequestException $exception) {
-            ResponseHandler::failure($exception);
-        } catch (ClientException $exception) {
             ResponseHandler::failure($exception);
         } catch (\Exception $exception) {
             throw $exception;

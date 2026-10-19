@@ -208,7 +208,8 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 			}
 		}
 
-		if ($documentsAttributes['cpf'] !== null) {
+		// CPF vazio ('') com CNPJ preenchido não pode abortar a cotação
+		if (!empty($documentsAttributes['cpf'])) {
 			$this->destCpf = preg_replace('/\D/', '', $documentsAttributes['cpf']);
 			if (!preg_match('/^([0-9]{11})$/', $this->destCpf)) {
 				if (!empty($this->destCpf)) {
@@ -457,7 +458,8 @@ class Carrier extends AbstractCarrierOnline implements CarrierInterface
 	private function calcPrecoPrazo()
 	{
 		$token  = $this->getConfigData('codigo_acesso');
-		$client = new Client($token);
+		$apiUrl = $this->getConfigData('api_url');
+		$client = new Client((string)$token, $apiUrl ? ['base_uri' => rtrim($apiUrl, '/') . '/'] : null);
 
 		/**
 		 * Preço

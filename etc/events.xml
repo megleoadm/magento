@@ -1,10 +1,14 @@
 <?xml version="1.0"?>
 
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
-  <event name="checkout_onepage_controller_success_action">
-    <observer name="Megleo_Delivery_Order_Created" instance="Megleo\Delivery\Observer\CreateShipmentQuote" />
- </event>
+    <!--
+        Disparado logo após o pedido ser gravado (checkout, API REST, admin, PayPal Express etc.),
+        sem depender do navegador do cliente carregar a página de sucesso.
+    -->
+    <event name="checkout_submit_all_after">
+        <observer name="Megleo_Delivery_Order_Created" instance="Megleo\Delivery\Observer\CreateShipmentQuote" />
+    </event>
     <event name="sales_model_service_quote_submit_success">
-      <observer name="custom_address_attribute_save" instance="Megleo\Delivery\Observer\SaveAddressAttributeObserver"/>
-  </event>
+        <observer name="custom_address_attribute_save" instance="Megleo\Delivery\Observer\SaveAddressAttributeObserver"/>
+    </event>
 </config>

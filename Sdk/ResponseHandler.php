@@ -32,16 +32,17 @@ class ResponseHandler
     }
 
     /**
-     * @param BadResponseException $guzzleException
+     * @param \Exception $guzzleException
      *
-     * @return MegleoException|BadResponseException
+     * @return MegleoException
      */
-    private static function parseException(BadResponseException $guzzleException)
+    private static function parseException(\Exception $guzzleException)
     {
-        $response = $guzzleException->getResponse();
+        // Timeout / falha de conexão (ConnectException) não têm resposta HTTP
+        $response = method_exists($guzzleException, 'getResponse') ? $guzzleException->getResponse() : null;
 
         if (is_null($response)) {
-            return $guzzleException;
+            return new MegleoException($guzzleException->getMessage());
         }
 
         if ($response->getStatusCode() == 401) {
@@ -55,10 +56,15 @@ class ResponseHandler
         try {
             $jsonError = self::toJson($body);
         } catch (InvalidJsonException $invalidJson) {
-            return $guzzleException;
+            return new MegleoException('HTTP ' . $response->getStatusCode() . ': ' . $body);
         }
 
-        return new MegleoException($jsonError->error);
+        $error = $jsonError->error ?? $jsonError->message ?? $jsonError->errors ?? $body;
+        if (!is_scalar($error)) {
+            $error = json_encode($error, JSON_UNESCAPED_UNICODE);
+        }
+
+        return new MegleoException('HTTP ' . $response->getStatusCode() . ': ' . $error);
     }
 
     /**

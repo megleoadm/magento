@@ -23,6 +23,13 @@
                         <field id="active">1</field>
                     </depends>
                 </field>
+                <field id="api_url" translate="label comment" type="text" sortOrder="14" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>URL da API (avançado)</label>
+                    <comment>Deixe em branco para usar https://app.megleo.com.br/api/v1_2/. Use apenas para testes/homologação.</comment>
+                    <depends>
+                        <field id="active">1</field>
+                    </depends>
+                </field>
 
                 <field id="dimensoes" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Medidas</label>

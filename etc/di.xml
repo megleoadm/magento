@@ -3,6 +3,9 @@
     <type name="Magento\Quote\Model\ShippingAddressManagement">
         <plugin disabled="false" name="Megleo_Delivery_Plugin_ShippingAddressManagement" sortOrder="10" type="Megleo\Delivery\Plugins\ShippingAddressManagementPlugin"/>
     </type>
+    <type name="Magento\Checkout\Model\ShippingInformationManagement">
+        <plugin disabled="false" name="Megleo_Delivery_Plugin_ShippingInformationManagement" sortOrder="10" type="Megleo\Delivery\Plugins\ShippingInformationManagementPlugin"/>
+    </type>
     <type name="Magento\Quote\Api\ShipmentEstimationInterface">
         <plugin disabled="false" name="Megleo_Delivery_Plugin_ShipmentEstimationPlugin" type="Megleo\Delivery\Plugins\ShipmentEstimationPlugin"/>
     </type>

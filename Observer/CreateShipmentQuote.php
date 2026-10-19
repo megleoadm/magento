@@ -56,6 +56,13 @@ class CreateShipmentQuote implements ObserverInterface
      */
     protected Logger $logger;
 
+    /**
+     * Loja do pedido sendo processado (o pedido pode ser criado pelo admin/API)
+     *
+     * @var int|null
+     */
+    private $storeId = null;
+
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Order $order,
@@ -76,72 +83,96 @@ class CreateShipmentQuote implements ObserverInterface
     public function execute(Observer $observer)
     {
         $order = $observer->getEvent()->getOrder();
-        $shippingMethod = $order->getShippingMethod(true);
 
-        if ($shippingMethod->getData('carrier_code') == 'megleo') {
-            $orderId = $order->getId();
-            $quote = $this->quoteFactory->create()->load($order->getQuoteId());
+        if (!$order || !$order->getId() || strpos((string)$order->getShippingMethod(), self::CODE . '_') !== 0) {
+            return;
+        }
 
-            // $transportadoraId = $this->getTransportadoraId($quote);
-            $shippingAddress  = $order->getShippingAddress();
+        // Pedido já registrado na Megleo
+        if (!empty($order->getData('megleo_metadata'))) {
+            return;
+        }
 
-            $token  = $this->getConfigData('codigo_acesso');
-            $client = new Client($token);
+        $this->storeId = $order->getStoreId();
 
-            $criarPedido = $client->criarPedidoSimplificado();
+        // Qualquer falha aqui não pode interromper a finalização do pedido
+        try {
+            $this->sendOrder($order, $observer->getEvent()->getQuote());
+        } catch (\Throwable $e) {
+            $message = 'Megleo: falha ao registrar o pedido: ' . $e->getMessage();
 
-            foreach ($order->getAllItems() as $item) {
-                if ($item->getProduct()->isVirtual()) {
-                    continue;
-                }
-
-                $criarPedido->withProduct($this->getItemDetails($item));
-            }
-
-            $customer = $this->convertCustomer($quote, $shippingAddress);
-
-            $criarPedido
-                ->withOrderId($orderId)
-                ->withCepOrigem($this->getFromZip($order))
-                ->withCepDestino($shippingAddress->getData('postcode'))
-                ->withValorNota($order->getSubtotal())
-                ->withCustomer($customer);
+            $this->logger->critical($message, [
+                'order' => $order->getIncrementId(),
+                'exception' => $e,
+            ]);
 
             try {
-                $response = $criarPedido->criar();
-
-                if (!empty($response->error)) {
-                    $this->logger->critical("ERRO API Megleo retornou um erro /api/v1_2/pedidos/criar_simplificado: " . $response->error);
-                    return false;
-                }
-            } catch (Exception $e) {
-                $this->logger->critical("ERRO chamada à API Megleo /api/v1_2/pedidos/criar_simplificado: " . $e->getMessage());
-                return false;
+                $order->addCommentToStatusHistory($message);
+                $order->save();
+            } catch (\Throwable $ignored) {
             }
-
-            $dataResponse = $response->data ?? [];
-            if (!is_array($dataResponse)) {
-                $dataResponse = [$dataResponse];
-            }
-
-            $metadata = [];
-            foreach ($dataResponse as $result) {
-                $data = new stdClass();
-
-                $data->cnpj_pagador = $result->cnpj_pagador;
-                $data->endereco_coleta = $result->endereco_coleta;
-                $data->transportadora = $result->transportadora;
-                $data->volumes = $result->volumes;
-                $data->valor_fatura = $result->valor_fatura;
-                
-                $metadata[] = $data;
-            }
-
-            $megleoMetadata = json_encode($metadata, JSON_PRETTY_PRINT);
-
-            $order->setMegleoMetadata($megleoMetadata);
-            $order->save();
         }
+    }
+
+    private function sendOrder($order, $quote = null)
+    {
+        if (!$quote || !$quote->getId()) {
+            $quote = $this->quoteFactory->create()->load($order->getQuoteId());
+        }
+
+        $shippingAddress = $order->getShippingAddress();
+
+        $token  = $this->getConfigData('codigo_acesso');
+        $apiUrl = $this->getConfigData('api_url');
+        $client = new Client((string)$token, $apiUrl ? ['base_uri' => rtrim($apiUrl, '/') . '/'] : null);
+
+        $criarPedido = $client->criarPedidoSimplificado();
+
+        foreach ($order->getAllItems() as $item) {
+            if ($item->getProduct()->isVirtual()) {
+                continue;
+            }
+
+            $criarPedido->withProduct($this->getItemDetails($item));
+        }
+
+        $customer = $this->convertCustomer($order, $quote, $shippingAddress);
+
+        $criarPedido
+            ->withOrderId($order->getId())
+            ->withCepOrigem($this->getFromZip($order))
+            ->withCepDestino(preg_replace('/\D/', '', (string)$shippingAddress->getData('postcode')))
+            ->withValorNota($order->getSubtotal())
+            ->withCustomer($customer);
+
+        $response = $criarPedido->criar();
+
+        if (!empty($response->error)) {
+            $error = is_scalar($response->error) ? $response->error : json_encode($response->error, JSON_UNESCAPED_UNICODE);
+            throw new Exception('API retornou erro em pedidos/criar_simplificado: ' . $error);
+        }
+
+        $dataResponse = $response->data ?? [];
+        if (!is_array($dataResponse)) {
+            $dataResponse = [$dataResponse];
+        }
+
+        $metadata = [];
+        foreach ($dataResponse as $result) {
+            $data = new stdClass();
+
+            $data->cnpj_pagador = $result->cnpj_pagador ?? null;
+            $data->endereco_coleta = $result->endereco_coleta ?? null;
+            $data->transportadora = $result->transportadora ?? null;
+            $data->volumes = $result->volumes ?? null;
+            $data->valor_fatura = $result->valor_fatura ?? null;
+
+            $metadata[] = $data;
+        }
+
+        $order->setMegleoMetadata(json_encode($metadata, JSON_PRETTY_PRINT));
+        $order->addCommentToStatusHistory('Megleo: pedido registrado com sucesso.');
+        $order->save();
     }
 
     private function getTransportadoraId($quote)
@@ -191,25 +222,14 @@ class CreateShipmentQuote implements ObserverInterface
         return $address;
     }
 
-    private function convertCustomer($quote, $shippingAddress): stdClass
+    private function convertCustomer($order, $quote, $shippingAddress): stdClass
     {
         $recipient  = new stdClass();
 
-        $cpf = $shippingAddress->getData('cpf');
-        $cnpj = $shippingAddress->getData('cnpj');
+        [$cpf, $cnpj] = $this->findDocuments($order, $quote, $shippingAddress);
 
         if (empty($cpf) && empty($cnpj)) {
-            $customerId = $quote->getData('customer_id');
-
-            if (!$customerId) {
-                $this->logger->critical("ERRO ao obter o perfil do cliente: " . self::class . '::convertCustomer()');
-                throw new Exception('ERRO ao obter o perfil do cliente');
-            }
-
-            $customer = $this->customerFactory->create()->load($customerId);
-
-            $cpf  = $customer->getData('cpf');
-            $cnpj = $customer->getData('cnpj');
+            throw new Exception('CPF/CNPJ do destinatário não encontrado no pedido nem no cadastro do cliente');
         }
 
         $recipient->tipo_pessoa = !empty($cnpj) ? 'pessoa_juridica' : 'pessoa_fisica';
@@ -217,10 +237,67 @@ class CreateShipmentQuote implements ObserverInterface
         $recipient->cnpj = $cnpj;
 
         $recipient->telefone = $shippingAddress->getTelephone();
-        $recipient->nome  = $quote->getData('customer_firstname') . ' ' . $quote->getData('customer_lastname');
-        $recipient->email = $quote->getData('customer_email');
+        $recipient->nome  = trim($order->getCustomerFirstname() . ' ' . $order->getCustomerLastname())
+            ?: trim($shippingAddress->getFirstname() . ' ' . $shippingAddress->getLastname());
+        $recipient->email = $order->getCustomerEmail();
 
         return $recipient;
+    }
+
+    /**
+     * Procura CPF/CNPJ em todas as fontes possíveis, na ordem de prioridade.
+     *
+     * @return array [cpf, cnpj]
+     */
+    private function findDocuments($order, $quote, $shippingAddress): array
+    {
+        $sources = [$shippingAddress, $order->getBillingAddress()];
+
+        if ($quote && $quote->getId()) {
+            $sources[] = $quote->getShippingAddress();
+            $sources[] = $quote->getBillingAddress();
+        }
+
+        if ($order->getCustomerId()) {
+            $sources[] = $this->customerFactory->create()->load($order->getCustomerId());
+        }
+
+        foreach ($sources as $source) {
+            if (!$source) {
+                continue;
+            }
+
+            $cpf  = $this->onlyDigits($source->getData('cpf'));
+            $cnpj = $this->onlyDigits($source->getData('cnpj'));
+
+            $extAttributes = method_exists($source, 'getExtensionAttributes') ? $source->getExtensionAttributes() : null;
+            if ($extAttributes && method_exists($extAttributes, 'getCpf')) {
+                $cpf  = $cpf ?: $this->onlyDigits($extAttributes->getCpf());
+                $cnpj = $cnpj ?: $this->onlyDigits($extAttributes->getCnpj());
+            }
+
+            if ($cpf || $cnpj) {
+                return [$cpf, $cnpj];
+            }
+        }
+
+        // Último recurso: taxvat do cliente / vat_id do endereço
+        foreach ([$order->getCustomerTaxvat(), $shippingAddress->getVatId(), $order->getBillingAddress() ? $order->getBillingAddress()->getVatId() : null] as $doc) {
+            $doc = $this->onlyDigits($doc);
+            if (strlen($doc) == 11) {
+                return [$doc, null];
+            }
+            if (strlen($doc) == 14) {
+                return [null, $doc];
+            }
+        }
+
+        return [null, null];
+    }
+
+    private function onlyDigits($value): string
+    {
+        return preg_replace('/\D/', '', (string)$value);
     }
 
     private function getItemDetails($item)
@@ -309,7 +386,7 @@ class CreateShipmentQuote implements ObserverInterface
         return $this->_scopeConfig->getValue(
             $path,
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
-            $this->storeManager->getStore(),
+            $this->storeId ?? $this->storeManager->getStore()->getId()
         );
     }
 
