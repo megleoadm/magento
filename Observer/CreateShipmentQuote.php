@@ -12,6 +12,9 @@ use Magento\Sales\Model\Order\Shipment;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Sales\Api\OrderStatusHistoryRepositoryInterface;
+use Magento\Sales\Model\Order\Status\HistoryFactory;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface as Logger;
 use stdClass;
@@ -63,13 +66,22 @@ class CreateShipmentQuote implements ObserverInterface
      */
     private $storeId = null;
 
+    private ResourceConnection $resource;
+
+    private HistoryFactory $historyFactory;
+
+    private OrderStatusHistoryRepositoryInterface $historyRepository;
+
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Order $order,
         CustomerFactory $customerFactory,
         QuoteFactory $quoteFactory,
         StoreManagerInterface $storeManager,
-        Logger $logger
+        Logger $logger,
+        ResourceConnection $resource,
+        HistoryFactory $historyFactory,
+        OrderStatusHistoryRepositoryInterface $historyRepository
     ) {
         $this->_scopeConfig = $scopeConfig;
 
@@ -78,6 +90,9 @@ class CreateShipmentQuote implements ObserverInterface
         $this->quoteFactory = $quoteFactory;
         $this->storeManager = $storeManager;
         $this->logger = $logger;
+        $this->resource = $resource;
+        $this->historyFactory = $historyFactory;
+        $this->historyRepository = $historyRepository;
     }
 
     public function execute(Observer $observer)
@@ -107,11 +122,39 @@ class CreateShipmentQuote implements ObserverInterface
             ]);
 
             try {
-                $order->addCommentToStatusHistory($message);
-                $order->save();
+                $this->saveResult($order, $message);
             } catch (\Throwable $ignored) {
             }
         }
+    }
+
+    /**
+     * Grava somente o retorno da Megleo (megleo_metadata) e a linha do histórico.
+     * O pedido não é salvo por inteiro: state/status e demais campos ficam como
+     * estiverem no banco, inclusive se outro processo (ex.: retorno do pagamento)
+     * tiver alterado o pedido enquanto a API da Megleo respondia.
+     */
+    private function saveResult($order, string $comment, ?string $metadata = null): void
+    {
+        $connection = $this->resource->getConnection();
+        $table = $this->resource->getTableName('sales_order');
+        $orderId = (int)$order->getId();
+
+        if ($metadata !== null) {
+            $connection->update($table, ['megleo_metadata' => $metadata], ['entity_id = ?' => $orderId]);
+            $order->setData('megleo_metadata', $metadata);
+        }
+
+        $status = $connection->fetchOne("SELECT status FROM {$table} WHERE entity_id = ?", [$orderId]);
+
+        $history = $this->historyFactory->create();
+        $history->setParentId($orderId)
+            ->setComment($comment)
+            ->setStatus($status ?: $order->getStatus())
+            ->setEntityName('order')
+            ->setIsCustomerNotified(null);
+
+        $this->historyRepository->save($history);
     }
 
     private function sendOrder($order, $quote = null)
@@ -170,9 +213,7 @@ class CreateShipmentQuote implements ObserverInterface
             $metadata[] = $data;
         }
 
-        $order->setMegleoMetadata(json_encode($metadata, JSON_PRETTY_PRINT));
-        $order->addCommentToStatusHistory('Megleo: pedido registrado com sucesso.');
-        $order->save();
+        $this->saveResult($order, 'Megleo: pedido registrado com sucesso.', json_encode($metadata, JSON_PRETTY_PRINT));
     }
 
     private function getTransportadoraId($quote)

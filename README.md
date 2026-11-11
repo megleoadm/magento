@@ -21,7 +21,7 @@ Execute os comandos na raiz da instalação do Magento, onde fica o arquivo `bin
 ### Opção 1: via Composer (recomendado)
 
 ```bash
-composer require megleo/delivery:1.4.x-dev
+composer require megleo/delivery:1.5.x-dev
 bin/magento module:enable Megleo_Delivery
 bin/magento setup:upgrade
 ```
@@ -29,12 +29,12 @@ bin/magento setup:upgrade
 Se o Composer recusar a instalação por causa de *minimum-stability*, use:
 
 ```bash
-composer require "megleo/delivery:1.4.x-dev@dev"
+composer require "megleo/delivery:1.5.x-dev@dev"
 ```
 
 ### Opção 2: manual
 
-1. Baixe o código da versão desejada, por exemplo [1.4.zip](https://github.com/megleoadm/magento/archive/refs/heads/1.4.zip).
+1. Baixe o código da versão desejada, por exemplo [1.5.zip](https://github.com/megleoadm/magento/archive/refs/heads/1.5.zip).
 2. Extraia o conteúdo para `app/code/Megleo/Delivery`. O arquivo `registration.php` deve ficar em `app/code/Megleo/Delivery/registration.php`.
 3. Execute:
 
@@ -106,10 +106,10 @@ Se precisar investigar, consulte `var/log/system.log` e `var/log/exception.log`.
 
 ## Atualização
 
-Via Composer, troque a versão no comando. Por exemplo, para a 1.5:
+Via Composer, troque a versão no comando. Por exemplo, para a 1.6:
 
 ```bash
-composer require megleo/delivery:1.5.x-dev
+composer require megleo/delivery:1.6.x-dev
 ```
 
 Na instalação manual, substitua o conteúdo de `app/code/Megleo/Delivery` pelos arquivos da nova versão.
@@ -136,7 +136,7 @@ bin/magento cache:flush
 
 ## Versões
 
-As versões são publicadas como branches deste repositório (`1.0` … `1.4`) e ficam disponíveis no Packagist como [`megleo/delivery`](https://packagist.org/packages/megleo/delivery), com o sufixo `.x-dev` (ex.: `1.4.x-dev`).
+As versões são publicadas como branches deste repositório (`1.0` … `1.5`) e ficam disponíveis no Packagist como [`megleo/delivery`](https://packagist.org/packages/megleo/delivery), com o sufixo `.x-dev` (ex.: `1.5.x-dev`).
 
 ## Suporte
 
